@@ -19,10 +19,13 @@ STAGE_DOCS: dict[int, dict] = {
             why="The questions decide which tables and links matter. A frozen scope stops the graph growing "
                 "into something slow that nobody uses.",
             input="Business owner + database owner knowledge", output="Scope sheet", tools="Shared document"),
-    2: dict(what="Open a READ-ONLY connection (ideally to a read replica) with a statement timeout.",
-            why="The pipeline must never change business data or slow down live applications.",
-            input="Host, database, read-only user (password from env / vault)",
-            output="Live DataSource handle", tools="psycopg 3, psycopg_pool"),
+    2: dict(what="Open a READ-ONLY connection (ideally to a read replica) with a statement timeout, or load "
+                 "several CSV files at once as read-only in-memory tables.",
+            why="The pipeline must never change business data or slow down live applications. Uploaded files "
+                "are checked (size, rows, encoding) and never written to disk.",
+            input="Host, database, read-only user (password from env / vault) - or several CSV files",
+            output="Live DataSource handle (+ keys and links inferred from files)",
+            tools="psycopg 3, psycopg_pool, csv"),
     3: dict(what="Read tables, columns, types, primary keys, foreign keys and row estimates from pg_catalog.",
             why="Keys and links already describe most of the graph. The catalog feeds the editor, the AI, "
                 "validation and the SQL whitelist. No business data is read here.",

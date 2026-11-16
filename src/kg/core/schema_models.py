@@ -41,6 +41,7 @@ class ColumnInfo(BaseModel):
     name: str
     pg_type: str
     nullable: bool = True
+    source_header: str = ""                     # original CSV header ("Cust ID"), empty for database columns
 
     @property
     def data_type(self) -> DataType:

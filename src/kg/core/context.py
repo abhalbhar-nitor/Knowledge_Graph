@@ -61,8 +61,18 @@ class PipelineContext:
     graph_report: Any = None
     snapshot: Any = None               # manifest dict
 
+    source_version: int = 0            # bumped whenever Stage 2 connects to a (new) source
+
     completed: set = field(default_factory=set)
     events: list = field(default_factory=list)
+
+    def clear_results_from_schema(self) -> None:
+        """A different source makes everything derived from the old one meaningless (Stages 3-16)."""
+        self.catalog, self.table_analysis = None, []
+        self.manual_ontology, self.ai_items, self.ai_meta = None, [], {}
+        self.hybrid_draft = self.ontology_report = self.approved_ontology = self.build_plan = None
+        self.extraction = self.dq_report = self.clean = self.graph = None
+        self.build_stats = self.graph_report = self.snapshot = None
 
     def log(self, stage: int, message: str, level: str = "info") -> None:
         self.events.append({"time": datetime.now().strftime("%H:%M:%S"), "stage": stage,

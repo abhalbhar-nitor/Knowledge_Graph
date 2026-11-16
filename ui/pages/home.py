@@ -3,8 +3,10 @@ import streamlit as st
 
 from components.bootstrap import get_ctx, reset_ctx
 from components.layout import BY_NO, PAGE_FILES, STAGE_DOCS, flow_strip, run_stage, table
+from kg.config import SAMPLE_FILES_DIR
 from kg.core.context import PARTS, STAGES
 from kg.pipeline import run_all
+from kg.sources.csv_source import read_directory
 
 ctx = get_ctx()
 
@@ -53,6 +55,14 @@ with c2:
         reset_ctx()
         ctx = get_ctx()
         if run_stage(run_all, ctx, success="Pipeline finished") is not None:
+            st.rerun()
+    st.write("Or run every stage on the bundled **Customer 360 CSV files** (7 files: the ontology is drafted "
+             "from the files by rules; no AI is needed).")
+    if st.button("▶ Run all 16 stages on the Customer 360 CSV files", width="stretch"):
+        reset_ctx()
+        ctx = get_ctx()
+        if run_stage(lambda: run_all(ctx, csv_files=read_directory(SAMPLE_FILES_DIR / "customer360"),
+                                     project="Customer 360"), success="Pipeline finished") is not None:
             st.rerun()
     if st.button("↺ Reset session", width="stretch"):
         reset_ctx()

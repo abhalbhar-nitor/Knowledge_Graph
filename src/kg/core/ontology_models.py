@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field, field_validator
 CLASS_NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9_]{0,62}$")      # PascalCase
 ATTR_NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,62}$")          # snake_case
 REL_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{0,62}$")           # UPPER_SNAKE
-SQL_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$")
+ONTOLOGY_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$")
+SQL_IDENT_RE =re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}(\.[A-Za-z_][A-Za-z0-9_]{0,62})?$")
 
 
 class DataType(str, Enum):
@@ -148,6 +149,14 @@ class Ontology(BaseModel):
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     approved_by: Optional[str] = None
     change_note: str = ""
+
+    @field_validator("ontology_id")
+    @classmethod
+    def _ontology_id(cls, v: str) -> str:
+        # the id is used as a folder name in the ontology repository and the graph store
+        if not ONTOLOGY_ID_RE.match(v):
+            raise ValueError(f"ontology id '{v}' may only use letters, digits, '_' and '-' (max 63 characters)")
+        return v
 
     def class_by_name(self, name: str) -> Optional[ClassDef]:
         return next((c for c in self.classes if c.name == name), None)

@@ -8,6 +8,11 @@ from kg.core.schema_models import SchemaCatalog
 from kg.sources import sample_data
 
 
+def _sortable(values) -> tuple:
+    """Sort key where NULL sorts last and is never compared with a real value (keys may contain NULL)."""
+    return tuple((v is None, 0 if v is None else v) for v in values)
+
+
 class SampleSource:
     def __init__(self, catalog: Optional[SchemaCatalog] = None, rows: Optional[dict[str, list[dict]]] = None):
         self.catalog = catalog or sample_data.build_catalog()
@@ -37,11 +42,11 @@ class SampleSource:
         def key(r):
             return tuple(r[k] for k in key_columns)
 
-        data = sorted(self.rows.get(table, []), key=key)
+        data = sorted(self.rows.get(table, []), key=lambda r: _sortable(key(r)))
         if since is not None and watermark_column:
             data = [r for r in data if r.get(watermark_column) is not None and r[watermark_column] >= since]
         if start_after is not None:
-            data = [r for r in data if key(r) > tuple(start_after)]
+            data = [r for r in data if _sortable(key(r)) > _sortable(tuple(start_after))]
         wanted = list(dict.fromkeys(list(key_columns) + list(columns)))
         for i in range(0, len(data), batch_size):
             yield [{c: r.get(c) for c in wanted} for r in data[i:i + batch_size]]

@@ -23,6 +23,10 @@ def run(ctx: PipelineContext) -> SchemaCatalog:
         if missing:
             ctx.log(3, f"Scope tables not found in the database: {missing}", "warning")
         catalog.tables = {k: v for k, v in catalog.tables.items() if k in in_scope}
+        if not catalog.tables:
+            raise ValueError("None of the tables in the Stage 1 scope exist in this source "
+                             f"(source tables: {sorted(ctx.source.introspect_schema().tables)}). "
+                             "Clear 'Tables in scope' in Stage 1 to use all tables, or fix the names.")
 
     ctx.invalidate_from(3)
     ctx.catalog = catalog
@@ -46,6 +50,10 @@ def catalog_rows(catalog: SchemaCatalog) -> list[dict]:
 def column_rows(catalog: SchemaCatalog, table: str) -> list[dict]:
     t = catalog.tables[table]
     fk_cols = {c: fk.ref_table for fk in t.foreign_keys for c in fk.columns}
-    return [{"column": c.name, "pg_type": c.pg_type, "ontology type": c.data_type.value,
-             "nullable": c.nullable, "PK": c.name in t.primary_key, "FK →": fk_cols.get(c.name, "")}
-            for c in t.columns.values()]
+    rows = [{"column": c.name, "pg_type": c.pg_type, "ontology type": c.data_type.value,
+             "nullable": c.nullable, "PK": c.name in t.primary_key, "FK →": fk_cols.get(c.name, ""),
+             "file header": c.source_header} for c in t.columns.values()]
+    if not any(r["file header"] for r in rows):          # only uploaded files have original headers
+        for r in rows:
+            del r["file header"]
+    return rows

@@ -14,6 +14,7 @@ import networkx as nx
 from pydantic import BaseModel
 
 from kg.core.context import PipelineContext
+from kg.core.ontology_draft import RESERVED_EDGE_PROPERTIES, RESERVED_NODE_ATTRIBUTES
 from kg.core.ontology_models import Cardinality, Ontology
 from kg.core.schema_models import COMPATIBLE, SchemaCatalog
 
@@ -61,6 +62,10 @@ def validate_structure(onto: Ontology, report: ValidationReport) -> None:
         for col, n in Counter(a.source_column for a in c.attributes if a.source_column).items():
             if n > 1:
                 report.add("warning", S, "COLUMN_MAPPED_TWICE", c.name, f"column '{col}' mapped {n} times")
+        for a in c.attributes:
+            if a.name in RESERVED_NODE_ATTRIBUTES:
+                report.add("error", S, "RESERVED_NAME", f"{c.name}.{a.name}",
+                           f"'{a.name}' is written by the graph builder on every node; rename the attribute")
         if c.mapping is None:
             report.add("warning", S, "UNMAPPED_CLASS", c.name, "no PostgreSQL mapping; no nodes will be built")
 
@@ -71,6 +76,10 @@ def validate_structure(onto: Ontology, report: ValidationReport) -> None:
         for side, cls in (("source", r.source_class), ("target", r.target_class)):
             if cls not in class_names:
                 report.add("error", S, "MISSING_CLASS", r.key, f"{side} class '{cls}' does not exist")
+        for p in r.properties:
+            if p.name in RESERVED_EDGE_PROPERTIES:
+                report.add("error", S, "RESERVED_NAME", f"{r.key}.{p.name}",
+                           f"'{p.name}' is written by the graph builder on every edge; rename the property")
         if r.mapping is None:
             report.add("warning", S, "UNMAPPED_RELATIONSHIP", r.key, "no mapping; no edges will be built")
         elif r.mapping.kind == "join_table" and r.cardinality != Cardinality.MANY_TO_MANY:
@@ -134,11 +143,13 @@ def validate_semantics(onto: Ontology, catalog: SchemaCatalog, report: Validatio
         if len(r.mapping.source_key_columns) != len(src.mapping.key_columns) or \
                 len(r.mapping.target_key_columns) != len(tgt.mapping.key_columns):
             report.add("error", S, "KEY_ARITY", r.key, "edge key columns must match the class key arity")
-        fk_cols = {tuple(fk.columns): fk.ref_table for fk in t.foreign_keys}
+        # a foreign key is a set of (column -> referenced column) pairs; the order its columns are listed in is irrelevant
+        fk_pairs = [(fk.ref_table, set(zip(fk.columns, fk.ref_columns))) for fk in t.foreign_keys]
         for cols, cls in ((r.mapping.source_key_columns, src), (r.mapping.target_key_columns, tgt)):
             if t.name == cls.mapping.source_table and sorted(cols) == sorted(cls.mapping.key_columns):
                 continue          # these columns are the row's own key
-            if fk_cols.get(tuple(cols)) != cls.mapping.source_table:
+            wanted = set(zip(cols, cls.mapping.key_columns))
+            if not any(ref == cls.mapping.source_table and pairs == wanted for ref, pairs in fk_pairs):
                 report.add("warning", S, "FK_NOT_DECLARED", r.key,
                            f"{t.name}{cols} has no declared FK to {cls.mapping.source_table}; "
                            "referential integrity is checked in Stage 12")

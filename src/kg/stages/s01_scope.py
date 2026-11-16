@@ -36,6 +36,18 @@ def default_scope() -> ScopeSheet:
     )
 
 
+def scope_for_files(project: str, filenames: list[str]) -> ScopeSheet:
+    """A neutral scope for a set of uploaded files (the default scope's questions are about the retail sample)."""
+    return ScopeSheet(
+        project=project,
+        business_questions=["How are the records in these files connected to each other?",
+                           "Which records sit at the centre of the network?",
+                           "Which records are orphaned or duplicated?"],
+        tables_in_scope=[], sensitive_columns=[],
+        users=["Data modeller", "Reviewer (domain owner)", "Business analyst"],
+        later_list=[f"Files: {', '.join(filenames)}"] if filenames else [])
+
+
 def run(ctx: PipelineContext, scope: ScopeSheet) -> ScopeSheet:
     if not scope.business_questions:
         raise ValueError("at least one business question is required")

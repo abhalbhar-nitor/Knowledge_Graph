@@ -10,11 +10,33 @@ ctx = stage_header(5)
 if guard(ctx, 3, 4):
     cat = ctx.catalog
     pii = set(ctx.scope.sensitive_columns) if ctx.scope else set()
+    if st.session_state.get("onto_edit_source") != ctx.source_version:     # a new source: drop the old editor state
+        for k in ("onto_edit", "draft_notes"):
+            st.session_state.pop(k, None)
+        st.session_state["onto_edit_source"] = ctx.source_version
     if "onto_edit" not in st.session_state:
         st.session_state["onto_edit"] = ctx.manual_ontology
 
-    c1, c2, c3 = st.columns(3)
-    if c1.button("Load example draft (Customer, Order, PLACED)", width="stretch"):
+    from_files = ctx.source_info.get("mode") == "csv"
+    c0, c1, c2, c3 = st.columns(4)
+    with c0.popover("🪄 Draft from the schema (rules)", width="stretch"):
+        st.caption("Makes a class for every table that has a key, a relationship for every foreign key / link "
+                   "between files and every bridge table. No AI. You review and edit it below before saving.")
+        d_id, d_ns, d_nm = s5.default_ids(ctx.scope.project if ctx.scope else "ontology")
+        did = st.text_input("Ontology id", d_id, key="dr_id", help="Letters, digits, _ and - only.")
+        dns = st.text_input("Namespace", d_ns, key="dr_ns")
+        dnm = st.text_input("Name", d_nm, key="dr_nm")
+        dau = st.text_input("Author", "data.modeller", key="dr_au")
+        if st.button("Create the draft", type="primary", key="dr_go"):
+            try:
+                draft = s5.draft_from_schema(ctx, did, dns, dnm, dau)
+                st.session_state["onto_edit"] = draft.ontology
+                st.session_state["draft_notes"] = draft.notes
+            except Exception as e:  # noqa: BLE001
+                st.error(f"{type(e).__name__}: {e}")
+    if c1.button("Load example draft (Customer, Order, PLACED)", width="stretch", disabled=from_files,
+                 help="The example maps the built-in retail tables, so it does not fit uploaded files."
+                 if from_files else None):
         st.session_state["onto_edit"] = s5.load_template()
     with c2.popover("Start a new empty ontology", width="stretch"):
         oid = st.text_input("Ontology id", "retail")
@@ -22,13 +44,22 @@ if guard(ctx, 3, 4):
         nm = st.text_input("Name", "Retail Customer Graph")
         au = st.text_input("Author", "data.modeller")
         if st.button("Create"):
-            st.session_state["onto_edit"] = s5.new_ontology(oid, ns, nm, au)
+            try:
+                st.session_state["onto_edit"] = s5.new_ontology(oid, ns, nm, au)
+                st.session_state.pop("draft_notes", None)
+            except Exception as e:  # noqa: BLE001
+                st.error(f"{type(e).__name__}: {e}")
     if ctx.manual_ontology is not None and c3.button("Revert to last saved draft", width="stretch"):
         st.session_state["onto_edit"] = ctx.manual_ontology
 
+    if st.session_state.get("draft_notes"):
+        with st.expander(f"📝 {len(st.session_state['draft_notes'])} note(s) from the draft - read these", expanded=True):
+            for note in st.session_state["draft_notes"]:
+                st.markdown(f"- {note}")
+
     onto = st.session_state["onto_edit"]
     if onto is None:
-        st.info("Load the example draft or start a new ontology to begin.")
+        st.info("Draft the ontology from the schema (🪄), load the example draft, or start a new ontology to begin.")
     else:
         def commit(fn, *a, **kw):
             try:

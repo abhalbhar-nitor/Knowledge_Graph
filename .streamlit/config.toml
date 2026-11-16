@@ -8,6 +8,8 @@ font = "sans serif"
 
 [server]
 headless = true
+# per uploaded file, in MB; must be at least KG_MAX_UPLOAD_MB (the application limit for CSV uploads)
+maxUploadSize = 50
 
 [client]
 toolbarMode = "minimal"
