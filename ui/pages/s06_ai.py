@@ -14,7 +14,12 @@ if guard(ctx, 5):
     with c1:
         live = st.toggle("Call Groq live", value=False, disabled=not settings.groq_available,
                          help="Needs GROQ_API_KEY in the environment / .env. Off = recorded offline response.")
-        if not settings.groq_available:
+        from_files = ctx.source_info.get("mode") == "csv"
+        if from_files and not live:
+            st.caption("Uploaded files: the recorded offline response only fits the built-in sample database, so "
+                       "it is not offered here. Set GROQ_API_KEY and switch on 'Call Groq live', or skip the AI "
+                       "step - the ontology drafted from your files in Stage 5 is complete without it.")
+        elif not settings.groq_available:
             st.caption("GROQ_API_KEY not set → the recorded offline response is used "
                        "(it contains deliberate hallucinations to show the backend guard).")
         samples = st.checkbox("Include masked sample values (max 3 rows, PII columns removed)", value=False)
@@ -22,7 +27,8 @@ if guard(ctx, 5):
                                 default=list(ctx.catalog.tables))
         actor = st.text_input("Requested by", ctx.manual_ontology.created_by)
         b1, b2 = st.columns(2)
-        if b1.button("🤖 Ask AI for suggestions", type="primary", width="stretch"):
+        if b1.button("🤖 Ask AI for suggestions", type="primary", width="stretch",
+                     disabled=from_files and not live):
             run_stage(s6.run, ctx, actor=actor, use_groq=live, include_samples=samples,
                       allowed_tables=set(tables), success="Suggestions received")
         if b2.button("Skip AI (manual only)", width="stretch"):

@@ -362,6 +362,9 @@ def run(ctx: PipelineContext, actor: str, use_groq: bool = False, include_sample
         allowed_tables: Optional[set[str]] = None) -> list[ReviewItem]:
     if ctx.manual_ontology is None or ctx.catalog is None:
         raise RuntimeError("Stages 3 and 5 must run first")
+    if not use_groq and ctx.source_info.get("mode") == "csv":
+        raise ValueError("The recorded offline response only fits the built-in sample database, not uploaded "
+                         "files. Call Groq live (set GROQ_API_KEY) or use 'Skip AI (manual only)'.")
     samples = None
     if include_samples:
         samples = {t: ctx.source.sample_rows(t, 3) for t in ctx.catalog.tables

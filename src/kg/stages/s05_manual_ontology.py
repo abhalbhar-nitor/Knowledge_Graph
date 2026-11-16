@@ -12,12 +12,42 @@ never corrupts the previous draft.
 from __future__ import annotations
 
 import json
+import re
 
 from kg.config import ONTOLOGY_DIR
 from kg.core.context import PipelineContext
+from kg.core.ontology_draft import OntologyDraft, draft_from_catalog
 from kg.core.ontology_models import (AttributeDef, ClassDef, ClassMapping, Ontology, OntologyStatus,
                                      RelationshipDef, RelationshipMapping)
 from kg.core.schema_models import SchemaCatalog
+from kg.stages.s04_schema_analysis import classify_table
+
+
+def default_ids(project: str) -> tuple[str, str, str]:
+    """(ontology_id, namespace, name) suggested from the project name, e.g. 'Customer 360' -> customer_360."""
+    slug = re.sub(r"[^a-z0-9]+", "_", project.lower()).strip("_") or "ontology"
+    if not slug[0].isalpha():
+        slug = f"o_{slug}"
+    slug = slug[:60]
+    return slug, f"com.example.{slug}", f"{project.strip() or 'Knowledge'} Graph".replace("Graph Graph", "Graph")
+
+
+def draft_from_schema(ctx: PipelineContext, ontology_id: str, namespace: str, name: str,
+                      author: str = "data.modeller") -> OntologyDraft:
+    """Rule-based draft (class per table, relationship per foreign key / bridge table) from the Stage 3-4 result.
+
+    Nothing is saved: the caller shows the draft and notes, and Stage 5's `run` saves what the user accepts.
+    """
+    if ctx.catalog is None:
+        raise RuntimeError("Stage 3 (schema extraction) must run first")
+    kinds = {a["table"]: a["type"] for a in ctx.table_analysis} if ctx.table_analysis else \
+        {t.name: classify_table(t, ctx.catalog) for t in ctx.catalog.tables.values()}
+    sensitive = set(ctx.scope.sensitive_columns) if ctx.scope else set()
+    draft = draft_from_catalog(ctx.catalog, kinds, ontology_id=ontology_id, namespace=namespace, name=name,
+                               author=author, sensitive_columns=sensitive)
+    ctx.log(5, f"Drafted from the schema: {len(draft.ontology.classes)} classes, "
+               f"{len(draft.ontology.relationships)} relationships, {len(draft.notes)} note(s) (not saved yet)")
+    return draft
 
 
 def new_ontology(ontology_id: str, namespace: str, name: str, author: str) -> Ontology:

@@ -12,6 +12,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 DATA_DIR = PROJECT_ROOT / "data"
 ONTOLOGY_DIR = DATA_DIR / "ontologies"
+SAMPLE_FILES_DIR = DATA_DIR / "samples"
 FIXTURE_DIR = DATA_DIR / "fixtures"
 
 
@@ -27,6 +28,10 @@ class Settings:
     groq_model: str = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
     pg_schemas: list[str] = field(
         default_factory=lambda: [s.strip() for s in os.environ.get("PG_SCHEMAS", "public").split(",") if s.strip()])
+    # Uploaded CSV files (Stage 2) are held in memory, so they are bounded.
+    max_upload_files: int = int(os.environ.get("KG_MAX_UPLOAD_FILES", "25"))
+    max_upload_mb: int = int(os.environ.get("KG_MAX_UPLOAD_MB", "25"))
+    max_upload_rows: int = int(os.environ.get("KG_MAX_UPLOAD_ROWS", "200000"))
 
     @property
     def ontology_repo_dir(self) -> Path:

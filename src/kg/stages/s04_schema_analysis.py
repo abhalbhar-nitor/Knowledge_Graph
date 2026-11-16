@@ -39,6 +39,11 @@ def _classify(t: TableInfo, catalog: SchemaCatalog) -> tuple[str, str]:
     return "entity", "own key and descriptive columns"
 
 
+def classify_table(t: TableInfo, catalog: SchemaCatalog) -> str:
+    """The table type only (entity / event / bridge / lookup / log)."""
+    return _classify(t, catalog)[0]
+
+
 def undeclared_fk_candidates(t: TableInfo, catalog: SchemaCatalog) -> list[dict]:
     """Columns named like another table's single-column PK but with no declared FK."""
     fk_cols = {c for fk in t.foreign_keys for c in fk.columns}
