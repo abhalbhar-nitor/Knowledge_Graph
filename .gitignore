@@ -3,7 +3,7 @@ __pycache__/
 .venv/
 venv/
 .env
-storage/
+storage
 !storage/.gitkeep
 .streamlit/secrets.toml
 *.log
